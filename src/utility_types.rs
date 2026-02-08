@@ -127,10 +127,7 @@ impl<T> Iterator for TokenAtOffset<T> {
     fn next(&mut self) -> Option<T> {
         match std::mem::replace(self, TokenAtOffset::None) {
             TokenAtOffset::None => None,
-            TokenAtOffset::Single(node) => {
-                *self = TokenAtOffset::None;
-                Some(node)
-            }
+            TokenAtOffset::Single(node) => Some(node),
             TokenAtOffset::Between(left, right) => {
                 *self = TokenAtOffset::Single(right);
                 Some(left)
