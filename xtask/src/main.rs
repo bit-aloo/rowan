@@ -4,9 +4,15 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::{Duration, Instant},
 };
+use std::{
+    env,
+    path::PathBuf,
+    sync::atomic::{AtomicBool, Ordering},
+    time::{Duration, Instant},
+};
 
 use anyhow::anyhow;
-use xshell::{Shell, cmd};
+use xshell::{cmd, Shell};
 pub type Result<T> = anyhow::Result<T>;
 
 fn main() {
@@ -78,7 +84,11 @@ impl CargoToml {
 
 fn dry_run() -> Option<&'static str> {
     let dry_run = DRY_RUN.load(Ordering::Relaxed);
-    if dry_run { Some("--dry-run") } else { None }
+    if dry_run {
+        Some("--dry-run")
+    } else {
+        None
+    }
 }
 
 pub fn section(name: &'static str) -> Section {
@@ -99,17 +109,22 @@ pub fn set_dry_run(yes: bool) {
 
 fn try_main() -> Result<()> {
     let mut sh = Shell::new()?;
+    let mut sh = Shell::new()?;
     let subcommand = std::env::args().nth(1);
     match subcommand {
         Some(it) if it == "ci" => (),
         _ => {
             print_usage();
             Err(anyhow!("invalid arguments"))?
+            Err(anyhow!("invalid arguments"))?
         }
     }
     let cargo_toml = cargo_toml()?;
     {
         let _s = section("TEST");
+        for &release in &[None, Some("--release")] {
+            cmd!(sh, "cargo test {release...} --workspace -- --nocapture").run()?;
+        }
         for &release in &[None, Some("--release")] {
             cmd!(sh, "cargo test {release...} --workspace -- --nocapture").run()?;
         }
@@ -122,9 +137,16 @@ fn try_main() -> Result<()> {
         || git::has_tag(&tag, &mut sh)?
         || git::current_branch(&mut sh)? != "master";
     set_dry_run(dry_run);
+    let dry_run = env::var("CI").is_err()
+        || git::has_tag(&tag, &mut sh)?
+        || git::current_branch(&mut sh)? != "master";
+    set_dry_run(dry_run);
 
     {
         let _s = section("PUBLISH");
+        cargo_toml.publish(&mut sh)?;
+        git::tag(&tag, &mut sh)?;
+        git::push_tags(&mut sh)?;
         cargo_toml.publish(&mut sh)?;
         git::tag(&tag, &mut sh)?;
         git::push_tags(&mut sh)?;
@@ -133,9 +155,9 @@ fn try_main() -> Result<()> {
 }
 
 pub mod git {
-    use xshell::{Shell, cmd};
+    use xshell::{cmd, Shell};
 
-    use super::{Result, dry_run};
+    use super::{dry_run, Result};
 
     pub fn current_branch(sh: &mut Shell) -> Result<String> {
         let res = cmd!(sh, "git branch --show-current").read()?;
@@ -182,6 +204,21 @@ SUBCOMMANDS:
     ci
 "
     )
+}
+
+impl Section {
+    fn new(name: &'static str) -> Section {
+        println!("::group::{}", name);
+        let start = Instant::now();
+        Section { name, start }
+    }
+}
+
+impl Drop for Section {
+    fn drop(&mut self) {
+        eprintln!("{}: {:.2?}", self.name, self.start.elapsed());
+        println!("::endgroup::");
+    }
 }
 
 impl Section {
