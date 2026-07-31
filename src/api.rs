@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt, iter, marker::PhantomData, ops::Range};
+use std::{borrow::Cow, fmt, iter, marker::PhantomData};
 
 use crate::{
     Direction, GreenNode, GreenNodeData, GreenToken, NodeOrToken, SyntaxKind, SyntaxText,
@@ -284,27 +284,6 @@ impl<L: Language> SyntaxNode<L> {
     pub fn clone_subtree(&self) -> SyntaxNode<L> {
         SyntaxNode::from(self.raw.clone_subtree())
     }
-
-    pub fn clone_for_update(&self) -> SyntaxNode<L> {
-        SyntaxNode::from(self.raw.clone_for_update())
-    }
-
-    pub fn is_mutable(&self) -> bool {
-        self.raw.is_mutable()
-    }
-
-    pub fn detach(&self) {
-        self.raw.detach()
-    }
-
-    pub fn splice_children<I: IntoIterator<Item = SyntaxElement<L>>>(
-        &self,
-        to_delete: Range<usize>,
-        to_insert: I,
-    ) {
-        let to_insert = to_insert.into_iter().map(cursor::SyntaxElement::from);
-        self.raw.splice_children(to_delete, to_insert)
-    }
 }
 
 impl<L: Language> SyntaxToken<L> {
@@ -376,10 +355,6 @@ impl<L: Language> SyntaxToken<L> {
     pub fn prev_token(&self) -> Option<SyntaxToken<L>> {
         self.raw.prev_token().map(SyntaxToken::from)
     }
-
-    pub fn detach(&self) {
-        self.raw.detach()
-    }
 }
 
 impl<L: Language> SyntaxElement<L> {
@@ -436,12 +411,6 @@ impl<L: Language> SyntaxElement<L> {
         match self {
             NodeOrToken::Node(it) => it.prev_sibling_or_token(),
             NodeOrToken::Token(it) => it.prev_sibling_or_token(),
-        }
-    }
-    pub fn detach(&self) {
-        match self {
-            NodeOrToken::Node(it) => it.detach(),
-            NodeOrToken::Token(it) => it.detach(),
         }
     }
 }
