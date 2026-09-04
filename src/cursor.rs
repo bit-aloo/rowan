@@ -139,20 +139,12 @@ unsafe fn free(mut data: ptr::NonNull<NodeData>) {
 impl NodeData {
     #[inline]
     fn new(
-        parent: Option<SyntaxNode>,
+        parent: Option<ptr::NonNull<NodeData>>,
         index: u32,
         offset: TextSize,
         green: Green,
     ) -> ptr::NonNull<NodeData> {
-        let parent = ManuallyDrop::new(parent);
-        let res = NodeData {
-            _c: Count::new(),
-            rc: Cell::new(1),
-            parent: parent.as_ref().map(|it| it.ptr),
-            index,
-            green,
-            offset,
-        };
+        let res = NodeData { _c: Count::new(), rc: Cell::new(1), parent, index, green, offset };
         unsafe { ptr::NonNull::new_unchecked(Box::into_raw(Box::new(res))) }
     }
 
@@ -296,8 +288,9 @@ impl SyntaxNode {
         index: u32,
         offset: TextSize,
     ) -> SyntaxNode {
+        let parent = ManuallyDrop::new(parent);
         let green = Green::Node { ptr: green.into() };
-        SyntaxNode { ptr: NodeData::new(Some(parent), index, offset, green) }
+        SyntaxNode { ptr: NodeData::new(Some(parent.ptr), index, offset, green) }
     }
 
     pub fn clone_subtree(&self) -> SyntaxNode {
@@ -560,8 +553,9 @@ impl SyntaxToken {
         index: u32,
         offset: TextSize,
     ) -> SyntaxToken {
+        let parent = ManuallyDrop::new(parent);
         let green = Green::Token { ptr: green.into() };
-        SyntaxToken { ptr: NodeData::new(Some(parent), index, offset, green) }
+        SyntaxToken { ptr: NodeData::new(Some(parent.ptr), index, offset, green) }
     }
 
     #[inline]
