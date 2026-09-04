@@ -261,6 +261,10 @@ impl<L: Language> SyntaxToken<L> {
         self.raw.text_range()
     }
 
+    pub fn text_range_including_trivia(&self) -> TextRange {
+        self.raw.text_range_including_trivia()
+    }
+
     pub fn index(&self) -> usize {
         self.raw.index()
     }

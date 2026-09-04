@@ -10,7 +10,7 @@ use countme::Count;
 use crate::{
     arc::{Arc, HeaderSlice, ThinArc},
     green::SyntaxKind,
-    TextSize,
+    TextRange, TextSize,
 };
 
 #[derive(PartialEq, Eq, Hash)]
@@ -121,6 +121,11 @@ impl GreenTokenData {
     #[inline]
     pub fn text_len(&self) -> TextSize {
         TextSize::of(self.text())
+    }
+
+    #[inline]
+    pub(crate) fn text_range(&self) -> TextRange {
+        TextRange::at(self.leading_trivia_len(), self.text_len())
     }
 
     #[inline]

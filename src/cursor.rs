@@ -498,7 +498,7 @@ impl SyntaxNode {
         }
 
         let mut children = self.children_with_tokens().filter(|child| {
-            let child_range = child.text_range();
+            let child_range = child.text_range_including_trivia();
             !child_range.is_empty()
                 && (child_range.start() <= offset && offset <= child_range.end())
         });
@@ -579,7 +579,12 @@ impl SyntaxToken {
 
     #[inline]
     pub fn text_range(&self) -> TextRange {
-        self.data().text_range()
+        self.green().text_range() + self.data().offset()
+    }
+
+    #[inline]
+    pub fn text_range_including_trivia(&self) -> TextRange {
+        TextRange::at(self.data().offset(), self.green().text_len_including_trivia())
     }
 
     #[inline]
@@ -687,6 +692,14 @@ impl SyntaxElement {
     }
 
     #[inline]
+    fn text_range_including_trivia(&self) -> TextRange {
+        match self {
+            NodeOrToken::Node(it) => it.text_range(),
+            NodeOrToken::Token(it) => it.text_range_including_trivia(),
+        }
+    }
+
+    #[inline]
     pub fn index(&self) -> usize {
         match self {
             NodeOrToken::Node(it) => it.index(),
@@ -754,7 +767,8 @@ impl SyntaxElement {
     }
 
     fn token_at_offset(&self, offset: TextSize) -> TokenAtOffset<SyntaxToken> {
-        assert!(self.text_range().start() <= offset && offset <= self.text_range().end());
+        let range = self.text_range_including_trivia();
+        assert!(range.start() <= offset && offset <= range.end());
         match self {
             NodeOrToken::Token(token) => TokenAtOffset::Single(token.clone()),
             NodeOrToken::Node(node) => node.token_at_offset(offset),
