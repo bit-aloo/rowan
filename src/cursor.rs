@@ -551,9 +551,17 @@ impl SyntaxNode {
 
     pub fn child_or_token_at_range(&self, range: TextRange) -> Option<SyntaxElement> {
         let rel_range = range - self.offset();
-        self.green_ref().child_at_range(rel_range).map(|(index, rel_offset, green)| {
-            SyntaxElement::new(green, self.clone(), index as u32, self.offset() + rel_offset)
-        })
+        let (index, rel_offset, green) = self.green_ref().child_at_range(rel_range)?;
+        let child =
+            SyntaxElement::new(green, self.clone(), index as u32, self.offset() + rel_offset);
+        match child {
+            NodeOrToken::Token(token) if !token.text_range().contains_range(range) => token
+                .leading_trivia()
+                .chain(token.trailing_trivia())
+                .find(|it| it.text_range().contains_range(range))
+                .map(SyntaxElement::from),
+            child => Some(child),
+        }
     }
 }
 
@@ -739,6 +747,20 @@ impl SyntaxToken {
         self.leading_trivia().chain(iter::once(self.clone())).chain(self.trailing_trivia())
     }
 
+    fn token_at_offset(&self, offset: TextSize) -> TokenAtOffset<SyntaxToken> {
+        let mut tokens = self.with_trivia().filter(|token| {
+            let range = token.text_range();
+            !range.is_empty() && range.start() <= offset && offset <= range.end()
+        });
+        let Some(left) = tokens.next() else {
+            return TokenAtOffset::None;
+        };
+        match tokens.next() {
+            Some(right) => TokenAtOffset::Between(left, right),
+            None => TokenAtOffset::Single(left),
+        }
+    }
+
     pub fn leading_trivia(
         &self,
     ) -> impl DoubleEndedIterator<Item = SyntaxToken> + ExactSizeIterator {
@@ -878,7 +900,7 @@ impl SyntaxElement {
         let range = self.text_range_including_trivia();
         assert!(range.start() <= offset && offset <= range.end());
         match self {
-            NodeOrToken::Token(token) => TokenAtOffset::Single(token.clone()),
+            NodeOrToken::Token(token) => token.token_at_offset(offset),
             NodeOrToken::Node(node) => node.token_at_offset(offset),
         }
     }
