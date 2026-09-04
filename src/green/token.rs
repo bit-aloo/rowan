@@ -142,6 +142,11 @@ impl GreenTokenData {
     pub(crate) fn trailing_trivia_len(&self) -> TextSize {
         self.data.header.trailing_len
     }
+
+    #[inline]
+    pub(crate) fn text_len_including_trivia(&self) -> TextSize {
+        self.leading_trivia_len() + self.text_len() + self.trailing_trivia_len()
+    }
 }
 
 impl GreenToken {
