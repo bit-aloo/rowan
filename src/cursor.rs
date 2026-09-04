@@ -175,8 +175,10 @@ impl NodeData {
 
     #[inline]
     fn parent_node(&self) -> Option<SyntaxNode> {
-        let parent = self.parent()?;
-        debug_assert!(matches!(parent.green, Green::Node { .. }));
+        let mut parent = self.parent()?;
+        while !matches!(parent.green, Green::Node { .. }) {
+            parent = parent.parent()?;
+        }
         parent.inc_rc();
         Some(SyntaxNode { ptr: ptr::NonNull::from(parent) })
     }
@@ -197,10 +199,7 @@ impl NodeData {
     fn green_siblings(&self) -> slice::Iter<'_, GreenChild> {
         match &self.parent().map(|it| &it.green) {
             Some(Green::Node { ptr }) => unsafe { &*ptr.as_ptr() }.children().raw,
-            Some(Green::Token { .. }) => {
-                debug_assert!(false);
-                [].iter()
-            }
+            Some(Green::Token { .. }) => [].iter(),
             None => [].iter(),
         }
     }
@@ -558,6 +557,17 @@ impl SyntaxToken {
         SyntaxToken { ptr: NodeData::new(Some(parent.ptr), index, offset, green) }
     }
 
+    fn new_trivia(
+        green: &GreenTokenData,
+        parent: SyntaxToken,
+        index: u32,
+        offset: TextSize,
+    ) -> SyntaxToken {
+        let parent = ManuallyDrop::new(parent);
+        let green = Green::Token { ptr: green.into() };
+        SyntaxToken { ptr: NodeData::new(Some(parent.ptr), index, offset, green) }
+    }
+
     #[inline]
     fn data(&self) -> &NodeData {
         unsafe { self.ptr.as_ref() }
@@ -605,6 +615,10 @@ impl SyntaxToken {
                 ""
             }
         }
+    }
+
+    pub fn text_including_trivia(&self) -> String {
+        self.with_trivia().map(|token| token.text().to_owned()).collect()
     }
 
     #[inline]
@@ -663,6 +677,44 @@ impl SyntaxToken {
                 .find_map(|it| it.prev_sibling_or_token())
                 .and_then(|element| element.last_token()),
         }
+    }
+
+    pub(crate) fn with_trivia(&self) -> impl Iterator<Item = SyntaxToken> {
+        self.leading_trivia().chain(iter::once(self.clone())).chain(self.trailing_trivia())
+    }
+
+    pub fn leading_trivia(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = SyntaxToken> + ExactSizeIterator {
+        self.trivia(true)
+    }
+
+    pub fn trailing_trivia(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = SyntaxToken> + ExactSizeIterator {
+        self.trivia(false)
+    }
+
+    fn trivia(
+        &self,
+        leading: bool,
+    ) -> impl DoubleEndedIterator<Item = SyntaxToken> + ExactSizeIterator {
+        let green = self.green();
+        let (start, len) = if leading {
+            (self.data().offset(), green.leading_trivia().len())
+        } else {
+            (self.text_range().end(), green.trailing_trivia().len())
+        };
+        let token = self.clone();
+        (0..len).map(move |index| {
+            let trivia = if leading {
+                token.green().leading_trivia()
+            } else {
+                token.green().trailing_trivia()
+            };
+            let offset = start + trivia[..index].iter().map(|it| it.text_len()).sum::<TextSize>();
+            SyntaxToken::new_trivia(&trivia[index], token.clone(), index as u32, offset)
+        })
     }
 }
 

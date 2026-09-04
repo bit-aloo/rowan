@@ -273,6 +273,22 @@ impl<L: Language> SyntaxToken<L> {
         self.raw.text()
     }
 
+    pub fn text_including_trivia(&self) -> String {
+        self.raw.text_including_trivia()
+    }
+
+    pub fn leading_trivia(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = SyntaxToken<L>> + ExactSizeIterator {
+        self.raw.leading_trivia().map(SyntaxToken::from)
+    }
+
+    pub fn trailing_trivia(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = SyntaxToken<L>> + ExactSizeIterator {
+        self.raw.trailing_trivia().map(SyntaxToken::from)
+    }
+
     pub fn green(&self) -> &GreenTokenData {
         self.raw.green()
     }
