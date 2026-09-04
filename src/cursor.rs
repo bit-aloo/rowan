@@ -858,12 +858,7 @@ impl fmt::Debug for SyntaxNode {
 
 impl fmt::Display for SyntaxNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.preorder_with_tokens()
-            .filter_map(|event| match event {
-                WalkEvent::Enter(NodeOrToken::Token(token)) => Some(token),
-                _ => None,
-            })
-            .try_for_each(|it| fmt::Display::fmt(&it, f))
+        self.text().fmt(f)
     }
 }
 
@@ -886,7 +881,7 @@ impl Hash for SyntaxToken {
 
 impl fmt::Display for SyntaxToken {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self.text(), f)
+        fmt::Display::fmt(&self.text_including_trivia(), f)
     }
 }
 

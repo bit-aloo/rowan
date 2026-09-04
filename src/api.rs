@@ -62,17 +62,28 @@ impl<L: Language> fmt::Display for SyntaxNode<L> {
 impl<L: Language> fmt::Debug for SyntaxToken<L> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}@{:?}", self.kind(), self.text_range())?;
-        if self.text().len() < 25 {
-            return write!(f, " {:?}", self.text());
-        }
         let text = self.text();
-        for idx in 21..25 {
-            if text.is_char_boundary(idx) {
-                let text = format!("{} ...", &text[..idx]);
-                return write!(f, " {:?}", text);
-            }
+        if text.len() < 25 {
+            write!(f, " {text:?}")?;
+        } else {
+            let idx = (21..25).find(|&idx| text.is_char_boundary(idx)).unwrap();
+            write!(f, " {:?}", format!("{} ...", &text[..idx]))?;
         }
-        unreachable!()
+        write!(f, " [")?;
+        for (idx, piece) in self.leading_trivia().enumerate() {
+            if idx > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{:?}({:?})", piece.kind(), piece.text())?;
+        }
+        write!(f, "] [")?;
+        for (idx, piece) in self.trailing_trivia().enumerate() {
+            if idx > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{:?}({:?})", piece.kind(), piece.text())?;
+        }
+        write!(f, "]")
     }
 }
 
